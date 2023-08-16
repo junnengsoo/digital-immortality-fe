@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import CallbackContext
 from telegram import ParseMode, InlineKeyboardButton,InlineKeyboardMarkup
 from telegram.ext.filters import Filters
-from telegram.ext import Updater, CommandHandler, MessageHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler
 
 from telegram import LabeledPrice, ParseMode
 from telegram.ext import PreCheckoutQueryHandler
@@ -19,6 +19,9 @@ load_dotenv()
 # Get the tokens from the environment variables
 bot_token = os.getenv('BOT_TOKEN')
 stripe_token = os.getenv('STRIPE_TOKEN')
+
+# State for checking if the user is in conversation
+LISTENING = 1
 
 updater = Updater(bot_token,
 				use_context=True)
@@ -52,12 +55,24 @@ def start(update: Update, context: CallbackContext):
         #return  # quit function
     else:
         update.message.reply_text("Good day Sir.")
+        return LISTENING
+    
+def listen(update: Update, context: CallbackContext):
+    # You can add logic here to handle user input.
+    user_input = update.message.text
+    update.message.reply_text(f"You said: {user_input}")
+    return LISTENING
 
 def help(update: Update, context: CallbackContext):
 	update.message.reply_text("""Available Commands :-
 	/start - Gatekeeping. To check if you can continue to use the bot.
 	/subscribe - 
 or simply chat if you are subscribed! """)
+
+def save(update: Update, context: CallbackContext):
+    # Do your API call here
+    update.message.reply_text("Conversation ended and data saved.")
+    return ConversationHandler.END
 
 def subscribe(update: Update, context: CallbackContext):
     out = context.bot.send_invoice(
@@ -70,6 +85,7 @@ def subscribe(update: Update, context: CallbackContext):
         prices=[LabeledPrice("Pay", PRICE)],
         need_name=False,
     )
+
 def pre_checkout_handler(update: Update, context: CallbackContext):
     """https://core.telegram.org/bots/api#answerprecheckoutquery"""
     query = update.pre_checkout_query
@@ -129,20 +145,26 @@ def unknown_text(update: Update, context: CallbackContext): #chats with verified
         update.message.reply_text(update.message.text)
     
 def _add_handlers(updater):
-    updater.dispatcher.add_handler(CommandHandler('start', start))
+    conversation_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            LISTENING: [MessageHandler(Filters.text & ~Filters.command, listen)]
+        },
+        fallbacks=[CommandHandler('save', save)]
+    )
+
+    updater.dispatcher.add_handler(conversation_handler)
+
     updater.dispatcher.add_handler(CommandHandler('subscribe', subscribe))
     updater.dispatcher.add_handler(CommandHandler('help', help))
 
     updater.dispatcher.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
     updater.dispatcher.add_handler(MessageHandler(Filters._SuccessfulPayment, successful_payment_callback))
+    
     #Admin
     updater.dispatcher.add_handler(CommandHandler('addWL', addWL))
 
-#updater.dispatcher.add_handler(MessageHandler(Filters.text, unknown))
-#updater.dispatcher.add_handler(MessageHandler(
-#	Filters.command, unknown)) # Filters out unknown commands
-
-# Filters out unknown messages.
+    # Filters out unknown messages.
     updater.dispatcher.add_handler(MessageHandler(Filters.text, unknown_text))
 
 
