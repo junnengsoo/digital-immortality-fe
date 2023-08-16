@@ -2,21 +2,30 @@
 import requests
 import json
 import time
-from telegram.update import Update
-from telegram.ext.callbackcontext import CallbackContext
+from telegram import Update
+from telegram.ext import CallbackContext
 from telegram import ParseMode, InlineKeyboardButton,InlineKeyboardMarkup
 from telegram.ext.filters import Filters
 from telegram.ext import Updater, CommandHandler, MessageHandler
 
 from telegram import LabeledPrice, ParseMode
 from telegram.ext import PreCheckoutQueryHandler
+import os
+from dotenv import load_dotenv
 
-updater = Updater("6383862027:AAGqH0gFFf-KFhrJpqW6AKdfr1qlsD9X4fo",
+# Load the .env file
+load_dotenv()
+
+# Get the tokens from the environment variables
+bot_token = os.getenv('BOT_TOKEN')
+stripe_token = os.getenv('STRIPE_TOKEN')
+
+updater = Updater(bot_token,
 				use_context=True)
 users=[]
 
 
-STRIPE_TOKEN = "284685063:TEST:ZjdiNWRkYmI5NDYz"
+STRIPE_TOKEN = stripe_token
 with open("shifu/users.txt") as userfile :
     for line in userfile:
         # remove linebreak from a current name
@@ -90,30 +99,25 @@ def checkSub(update: Update, context: CallbackContext):
 	#update.message.reply_text("Bot Users: {}".format(config_IDs))
     
 def addWL(update: Update, context: CallbackContext):
-    #config_IDs.insert(0,context.args[0])
-    # open file in write mode
-        # open file and read the content in a list
     users = []
-    with open("shifu/users.txt") as userfile :
+    with open("shifu/users.txt") as userfile:
         for line in userfile:
-            # remove linebreak from a current name
-            # linebreak is the last character of each line
             x = line[:-1]
-
-            # add current item to the list
             users.append(x)
     userfile.close()
-    users.append(context.args[0])
-    # display list
 
-    with open(r'shifu/users.txt', 'w') as userfile:
-        for item in users:
-            # write each item on a new line
-            userfile.write("%s\n" % item)
-        #print('Done')
-    #print (context.args[0])
-    userfile.close()
-    update.message.reply_text("Bot Users: {}".format(users))    
+    new_user_id = context.args[0]
+    if new_user_id not in users:
+        users.append(new_user_id)
+        with open(r'shifu/users.txt', 'w') as userfile:
+            for item in users:
+                userfile.write("%s\n" % item)
+        userfile.close()
+        print("User added. Current users:", users) # Print users to console
+        update.message.reply_text("User added successfully.")
+    else:
+        print("User already exists in the list. Current users:", users) # Print users to console
+        update.message.reply_text("User already exists in the list.")
 
 #def unknown(update: Update, context: CallbackContext):
 #	update.message.reply_text(
