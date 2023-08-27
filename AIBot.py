@@ -32,7 +32,12 @@ users=[]
 STRIPE_TOKEN = stripe_token
 PRICE = 500
 
-with open("shifu/users.txt") as userfile :
+if not os.path.exists("users.txt"):
+    # If it doesn't exist, create it
+    with open("users.txt", "w") as userfile:
+        userfile.write("")  # This will create an empty file
+
+with open("users.txt") as userfile :
     for line in userfile:
         # remove linebreak from a current name
         # linebreak is the last character of each line
@@ -56,14 +61,15 @@ def start(update: Update, context: CallbackContext):
             Hey, you need to subscribe. """)
         #return  # quit function
     else:
-        # Initialize chat in the backend by calling the API
-        response = requests.post(f"{API_BASE_URL}/startChat?user={user_id}&influencer={influencer}")
-        if response.status_code == 200:
-            # Successful connection to the API and chat initialized
-            update.message.reply_text(response.text)
-        else:
-            # Handle error
-            update.message.reply_text("Error initializing chat.")
+        # # Initialize chat in the backend by calling the API
+        # response = requests.post(f"{API_BASE_URL}/startChat?user={user_id}&influencer={influencer}")
+        # if response.status_code == 200:
+        #     # Successful connection to the API and chat initialized
+        #     update.message.reply_text(response.text)
+        # else:
+        #     # Handle error
+        #     update.message.reply_text("Error initializing chat.")
+        update.message.reply_text("Hello started")
         return LISTENING
     
 # Constantly listens for text after /start
@@ -71,23 +77,23 @@ def listen(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     user_input = update.message.text
     update.message.reply_text(f"You said: {user_input}") # For debugging
-    data = {
-        "message": user_input
-    }
-    response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data)
+    # data = {
+    #     "message": user_input
+    # }
+    # response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data)
 
-    # Check if the request was successful (HTTP 200 status)
-    if response.status_code == 200:
-        json_response = response.json()
+    # # Check if the request was successful (HTTP 200 status)
+    # if response.status_code == 200:
+    #     json_response = response.json()
 
-        # Assuming the API returns a JSON object with a "Message" key
-        api_message = json_response.get("Message", "Sorry, I didn't understand that.")
+    #     # Assuming the API returns a JSON object with a "Message" key
+    #     api_message = json_response.get("Message", "Sorry, I didn't understand that.")
 
-        # Reply to the user with the message from the API
-        update.message.reply_text(api_message)
-    else:
-        # Handle API errors (e.g., if the API is down or returns an error code)
-        update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
+    #     # Reply to the user with the message from the API
+    #     update.message.reply_text(api_message)
+    # else:
+    #     # Handle API errors (e.g., if the API is down or returns an error code)
+    #     update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
     return LISTENING
 
 def help(update: Update, context: CallbackContext):
@@ -98,15 +104,17 @@ def help(update: Update, context: CallbackContext):
 
 def save(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    response = requests.post(f"{API_BASE_URL}/save?user={user_id}&influencer={influencer}")
-    if response.status_code == 200:
-        # Successfully saved
-        update.message.reply_text("Chat has been saved successfully.")
-        return ConversationHandler.END
-    else:
-        # Handle error
-        update.message.reply_text("Error saving chat.")
-        return LISTENING
+    # response = requests.post(f"{API_BASE_URL}/save?user={user_id}&influencer={influencer}")
+    # if response.status_code == 200:
+    #     # Successfully saved
+    #     update.message.reply_text("Chat has been saved successfully.")
+    #     return ConversationHandler.END
+    # else:
+    #     # Handle error
+    #     update.message.reply_text("Error saving chat.")
+    #     return LISTENING
+    update.message.reply_text("Saved")
+    return ConversationHandler.END
 
 
 def subscribe(update: Update, context: CallbackContext):
@@ -132,10 +140,10 @@ def successful_payment_callback(update: Update, context):
 
    
 #Admin Functions
-def checkSub(update: Update, context: CallbackContext):
+def checkSub(update: Update, context: CallbackContext): 
     users = []
     # open file and read the content in a list
-    with open("shifu/users.txt") as userfile :
+    with open("users.txt") as userfile :
         for line in userfile:
             # remove linebreak from a current name
             # linebreak is the last character of each line
@@ -151,7 +159,7 @@ def checkSub(update: Update, context: CallbackContext):
     
 def addWL(update: Update, context: CallbackContext):
     users = []
-    with open("shifu/users.txt") as userfile:
+    with open("users.txt") as userfile:
         for line in userfile:
             x = line[:-1]
             users.append(x)
@@ -160,7 +168,7 @@ def addWL(update: Update, context: CallbackContext):
     new_user_id = context.args[0]
     if new_user_id not in users:
         users.append(new_user_id)
-        with open(r'shifu/users.txt', 'w') as userfile:
+        with open(r'users.txt', 'w') as userfile:
             for item in users:
                 userfile.write("%s\n" % item)
         userfile.close()
