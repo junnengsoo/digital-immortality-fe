@@ -19,6 +19,8 @@ load_dotenv()
 # Get the tokens from the environment variables
 bot_token = os.getenv('BOT_TOKEN')
 stripe_token = os.getenv('STRIPE_TOKEN')
+API_BASE_URL = "localhost:5000" # Replace accordingly
+influencer = "fabian" # Replace accordingly
 
 # State for checking if the user is in conversation
 LISTENING = 1
@@ -27,8 +29,9 @@ updater = Updater(bot_token,
 				use_context=True)
 users=[]
 
-
 STRIPE_TOKEN = stripe_token
+PRICE = 500
+
 with open("shifu/users.txt") as userfile :
     for line in userfile:
         # remove linebreak from a current name
@@ -40,7 +43,6 @@ with open("shifu/users.txt") as userfile :
 
 # display list
 userfile.close()
-PRICE = 500
 
 keyboard = [[InlineKeyboardButton("Refresh", callback_data="1")]]
  
@@ -54,25 +56,58 @@ def start(update: Update, context: CallbackContext):
             Hey, you need to subscribe. """)
         #return  # quit function
     else:
-        update.message.reply_text("Good day Sir.")
+        # Initialize chat in the backend by calling the API
+        response = requests.post(f"{API_BASE_URL}/startChat?user={user_id}&influencer={influencer}")
+        if response.status_code == 200:
+            # Successful connection to the API and chat initialized
+            update.message.reply_text(response.text)
+        else:
+            # Handle error
+            update.message.reply_text("Error initializing chat.")
         return LISTENING
     
+# Constantly listens for text after /start
 def listen(update: Update, context: CallbackContext):
-    # You can add logic here to handle user input.
+    user_id = update.effective_user.id
     user_input = update.message.text
-    update.message.reply_text(f"You said: {user_input}")
+    update.message.reply_text(f"You said: {user_input}") # For debugging
+    data = {
+        "message": user_input
+    }
+    response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data)
+
+    # Check if the request was successful (HTTP 200 status)
+    if response.status_code == 200:
+        json_response = response.json()
+
+        # Assuming the API returns a JSON object with a "Message" key
+        api_message = json_response.get("Message", "Sorry, I didn't understand that.")
+
+        # Reply to the user with the message from the API
+        update.message.reply_text(api_message)
+    else:
+        # Handle API errors (e.g., if the API is down or returns an error code)
+        update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
     return LISTENING
 
 def help(update: Update, context: CallbackContext):
 	update.message.reply_text("""Available Commands :-
 	/start - Gatekeeping. To check if you can continue to use the bot.
 	/subscribe - 
-or simply chat if you are subscribed! """)
+    or simply chat if you are subscribed! """)
 
 def save(update: Update, context: CallbackContext):
-    # Do your API call here
-    update.message.reply_text("Conversation ended and data saved.")
-    return ConversationHandler.END
+    user_id = update.effective_user.id
+    response = requests.post(f"{API_BASE_URL}/save?user={user_id}&influencer={influencer}")
+    if response.status_code == 200:
+        # Successfully saved
+        update.message.reply_text("Chat has been saved successfully.")
+        return ConversationHandler.END
+    else:
+        # Handle error
+        update.message.reply_text("Error saving chat.")
+        return LISTENING
+
 
 def subscribe(update: Update, context: CallbackContext):
     out = context.bot.send_invoice(
@@ -134,11 +169,6 @@ def addWL(update: Update, context: CallbackContext):
     else:
         print("User already exists in the list. Current users:", users) # Print users to console
         update.message.reply_text("User already exists in the list.")
-
-#def unknown(update: Update, context: CallbackContext):
-#	update.message.reply_text(
-#		"Sorry '%s' is not a valid command" % update.message.text)
-
 
 def unknown_text(update: Update, context: CallbackContext): #chats with verified user is here
     if (update.message.from_user['id'] == 5229876508):
