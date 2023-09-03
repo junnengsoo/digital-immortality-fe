@@ -19,7 +19,7 @@ load_dotenv()
 # Get the tokens from the environment variables
 bot_token = os.getenv('BOT_TOKEN')
 stripe_token = os.getenv('STRIPE_TOKEN')
-API_BASE_URL = "localhost:5000" # Replace accordingly
+API_BASE_URL = "https://mex.chat/api/v1" # Replace accordingly
 influencer = "fabian" # Replace accordingly
 
 # State for checking if the user is in conversation
@@ -37,14 +37,10 @@ if not os.path.exists("users.txt"):
     with open("users.txt", "w") as userfile:
         userfile.write("")  # This will create an empty file
 
-with open("users.txt") as userfile :
+with open("users.txt") as userfile:
     for line in userfile:
-        # remove linebreak from a current name
-        # linebreak is the last character of each line
-        x = line[:-1]
-
-        # add current item to the list
-        users.append(x)
+        user_id = line.strip()  # This will remove any leading or trailing whitespace, including newlines
+        users.append(user_id)
 
 # display list
 userfile.close()
@@ -53,7 +49,7 @@ keyboard = [[InlineKeyboardButton("Refresh", callback_data="1")]]
  
 def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    if user_id not in users:
+    if str(user_id) not in users:
         print("WARNING: Unauthorized access denied for {}.".format(user_id))
         reply_markup = InlineKeyboardMarkup(keyboard)
         #update.message.sendPhoto(chat_id=chat_id, photo="img.png", caption="This is the test photo caption")
@@ -61,39 +57,41 @@ def start(update: Update, context: CallbackContext):
             Hey, you need to subscribe. """)
         #return  # quit function
     else:
-        # # Initialize chat in the backend by calling the API
-        # response = requests.post(f"{API_BASE_URL}/startChat?user={user_id}&influencer={influencer}")
-        # if response.status_code == 200:
-        #     # Successful connection to the API and chat initialized
-        #     update.message.reply_text(response.text)
-        # else:
-        #     # Handle error
-        #     update.message.reply_text("Error initializing chat.")
-        update.message.reply_text("Hello started")
+        # Initialize chat in the backend by calling the API
+        response = requests.post(f"{API_BASE_URL}/startchat?user={user_id}&influencer={influencer}", timeout=20)
+        if response.status_code == 200:
+            # Successful connection to the API and chat initialized
+            update.message.reply_text(response.text)
+        else:
+            # Print more detailed error information
+            print(f"Error in start function. Status code: {response.status_code}. Response: {response.text}")
+            update.message.reply_text("Error initializing chat.")
+        # update.message.reply_text("Hello started")
         return LISTENING
     
 # Constantly listens for text after /start
 def listen(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     user_input = update.message.text
-    update.message.reply_text(f"You said: {user_input}") # For debugging
-    # data = {
-    #     "message": user_input
-    # }
-    # response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data)
+    # update.message.reply_text(f"You said: {user_input}") # For debugging
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "message": user_input
+    }
+    response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data, headers=headers)
 
-    # # Check if the request was successful (HTTP 200 status)
-    # if response.status_code == 200:
-    #     json_response = response.json()
+    # Check if the request was successful (HTTP 200 status)
+    if response.status_code == 200:
+        json_response = response.json()
 
-    #     # Assuming the API returns a JSON object with a "Message" key
-    #     api_message = json_response.get("Message", "Sorry, I didn't understand that.")
+        # Assuming the API returns a JSON object with a "Message" key
+        api_message = json_response.get("Message", "Sorry, I didn't understand that.")
 
-    #     # Reply to the user with the message from the API
-    #     update.message.reply_text(api_message)
-    # else:
-    #     # Handle API errors (e.g., if the API is down or returns an error code)
-    #     update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
+        # Reply to the user with the message from the API
+        update.message.reply_text(api_message)
+    else:
+        # Handle API errors (e.g., if the API is down or returns an error code)
+        update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
     return LISTENING
 
 def help(update: Update, context: CallbackContext):
@@ -104,17 +102,17 @@ def help(update: Update, context: CallbackContext):
 
 def save(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    # response = requests.post(f"{API_BASE_URL}/save?user={user_id}&influencer={influencer}")
-    # if response.status_code == 200:
-    #     # Successfully saved
-    #     update.message.reply_text("Chat has been saved successfully.")
-    #     return ConversationHandler.END
-    # else:
-    #     # Handle error
-    #     update.message.reply_text("Error saving chat.")
-    #     return LISTENING
-    update.message.reply_text("Saved")
-    return ConversationHandler.END
+    response = requests.post(f"{API_BASE_URL}/save?user={user_id}&influencer={influencer}")
+    if response.status_code == 200:
+        # Successfully saved
+        update.message.reply_text("Chat has been saved successfully.")
+        return ConversationHandler.END
+    else:
+        # Handle error
+        update.message.reply_text("Error saving chat.")
+        return LISTENING
+    # update.message.reply_text("Saved")
+    # return ConversationHandler.END
 
 
 def subscribe(update: Update, context: CallbackContext):
@@ -135,9 +133,24 @@ def pre_checkout_handler(update: Update, context: CallbackContext):
     query.answer(ok=True)
     
 def successful_payment_callback(update: Update, context):
-    #add to user db
+    # Extract user_id from the update
+    user_id = update.message.from_user.id
+
+    # Add user_id to users.txt
+    with open("users.txt", "a") as file:
+        file.write(str(user_id) + '\n')
+
+    users.append(str(user_id))
+
     update.message.reply_text("Thank you for subscribing! You may continue chatting")
 
+def unknown_text(update: Update, context: CallbackContext):
+    user_id = str(update.message.from_user.id)  # Convert user_id to string for comparison with users list
+
+    if user_id in users:
+        update.message.reply_text("Please use /start to initiate a chat or /save to save your conversation.")
+    else:
+        update.message.reply_text("You need to subscribe to use this bot. Use /subscribe to subscribe.")
    
 #Admin Functions
 def checkSub(update: Update, context: CallbackContext): 
@@ -177,10 +190,6 @@ def addWL(update: Update, context: CallbackContext):
     else:
         print("User already exists in the list. Current users:", users) # Print users to console
         update.message.reply_text("User already exists in the list.")
-
-def unknown_text(update: Update, context: CallbackContext): #chats with verified user is here
-    if (update.message.from_user['id'] == 5229876508):
-        update.message.reply_text(update.message.text)
     
 def _add_handlers(updater):
     conversation_handler = ConversationHandler(
@@ -197,7 +206,7 @@ def _add_handlers(updater):
     updater.dispatcher.add_handler(CommandHandler('help', help))
 
     updater.dispatcher.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
-    updater.dispatcher.add_handler(MessageHandler(Filters._SuccessfulPayment, successful_payment_callback))
+    updater.dispatcher.add_handler(MessageHandler(Filters.successful_payment, successful_payment_callback))
     
     #Admin
     updater.dispatcher.add_handler(CommandHandler('addWL', addWL))
