@@ -1,6 +1,5 @@
 
 import os
-import logging
 
 import requests
 from dotenv import load_dotenv
@@ -8,21 +7,12 @@ from telegram import InlineKeyboardButton, LabeledPrice, Update
 from telegram.ext import (CallbackContext, CommandHandler, ConversationHandler,
                           MessageHandler, PreCheckoutQueryHandler, filters, Application)
 
-# Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-# set higher logging level for httpx to avoid all GET and POST requests being logged
-logging.getLogger("httpx").setLevel(logging.WARNING)
-
-logger = logging.getLogger(__name__)
-
 # Load the .env file
 load_dotenv()
 
 # Get the tokens from the environment variables
 bot_token = "6526375040:AAHyjRA67xM5AfbNb0jMWtHwEfdZc5Wg9-M"
-stripe_token = "284685063:TEST:ZjdiNWRkYmI5NDYz"
+stripe_token = "284685063:TEST:ZTYzNTRhN2FmYmQy"
 API_BASE_URL = "https://mex.chat/api/v1" # Replace accordingly
 influencer = "fabian" # Replace accordingly
 
@@ -53,27 +43,28 @@ async def start(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if str(user_id) not in users:
         print("WARNING: Unauthorized access denied for {}.".format(user_id))
-        update.message.reply_text("Hey, you need to subscribe.")
+        await update.message.reply_text("Hey, you need to subscribe.")
     else:
-        update.message.reply_text("Please enter a temperature value between 0 and 1:")
+        await update.message.reply_text("Please enter a temperature value between 0 and 1:")
         return AWAITING_TEMPERATURE
 
 async def get_temperature(update: Update, context: CallbackContext):
     try:
         temperature = float(update.message.text)
+        print(temperature)
         if 0 <= temperature <= 1:
-            response = requests.post(f"{API_BASE_URL}/startchat?user={update.effective_user.id}&influencer={influencer}&temperature={temperature}", timeout=20)
+            response = requests.post(f"{API_BASE_URL}/startchat?user={update.effective_user.id}&influencer={influencer}&temperature={temperature}", timeout=60)
             if response.status_code == 200:
-                update.message.reply_text(response.text)
+                await update.message.reply_text(response.text)
             else:
                 print(f"Error in start function. Status code: {response.status_code}. Response: {response.text}")
-                update.message.reply_text("Error initializing chat.")
+                await update.message.reply_text("Error initializing chat.")
             return LISTENING
         else:
-            update.message.reply_text("Invalid temperature. Please enter a value between 0 and 1:")
+            await update.message.reply_text("Invalid temperature. Please enter a value between 0 and 1:")
             return AWAITING_TEMPERATURE
     except ValueError:
-        update.message.reply_text("Invalid input. Please enter a value between 0 and 1:")
+        await update.message.reply_text("Invalid input. Please enter a value between 0 and 1:")
         return AWAITING_TEMPERATURE
     
 # Constantly listens for text after /start
@@ -85,7 +76,7 @@ async def listen(update: Update, context: CallbackContext):
     data = {
         "message": user_input
     }
-    response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data, headers=headers)
+    response = requests.post(f"{API_BASE_URL}/chat?user={user_id}&influencer={influencer}", json=data, headers=headers, timeout=60)
 
     # Check if the request was successful (HTTP 200 status)
     if response.status_code == 200:
@@ -95,14 +86,14 @@ async def listen(update: Update, context: CallbackContext):
         api_message = json_response.get("Message", "Sorry, I didn't understand that.")
 
         # Reply to the user with the message from the API
-        update.message.reply_text(api_message)
+        await update.message.reply_text(api_message)
     else:
         # Handle API errors (e.g., if the API is down or returns an error code)
-        update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
+        await update.message.reply_text("Sorry, I'm having some issues right now. Please try again later.")
     return LISTENING
 
 async def help(update: Update, context: CallbackContext):
-	update.message.reply_text("""Available Commands :-
+	await update.message.reply_text("""Available Commands :-
 	/start - Gatekeeping. To check if you can continue to use the bot.
 	/subscribe - 
     or simply chat if you are subscribed! """)
@@ -126,7 +117,7 @@ async def cancel(update: Update, context: CallbackContext):
 
 
 async def subscribe(update: Update, context: CallbackContext):
-    out = context.bot.send_invoice(
+    out = await context.bot.send_invoice(
         chat_id=update.message.chat_id,
         title="Subscribe",
         description="Amount payable for 1 month usage",
@@ -140,7 +131,7 @@ async def subscribe(update: Update, context: CallbackContext):
 async def pre_checkout_handler(update: Update, context: CallbackContext):
     """https://core.telegram.org/bots/api#answerprecheckoutquery"""
     query = update.pre_checkout_query
-    query.answer(ok=True)
+    await query.answer(ok=True)
     
 async def successful_payment_callback(update: Update, context):
     # Extract user_id from the update
@@ -152,15 +143,15 @@ async def successful_payment_callback(update: Update, context):
 
     users.append(str(user_id))
 
-    update.message.reply_text("Thank you for subscribing! You may continue chatting")
+    await update.message.reply_text("Thank you for subscribing! You may continue chatting")
 
 async def unknown_text(update: Update, context: CallbackContext):
     user_id = str(update.message.from_user.id)  # Convert user_id to string for comparison with users list
 
     if user_id in users:
-        update.message.reply_text("Please use /start to initiate a chat.")
+        await update.message.reply_text("Please use /start to initiate a chat.")
     else:
-        update.message.reply_text("You need to subscribe to use this bot. Use /subscribe to subscribe.")
+        await update.message.reply_text("You need to subscribe to use this bot. Use /subscribe to subscribe.")
    
 #Admin Functions
 async def checkSub(update: Update, context: CallbackContext): 
@@ -177,7 +168,7 @@ async def checkSub(update: Update, context: CallbackContext):
 
     # display list
     userfile.close()
-    update.message.reply_text("Bot Users: {}".format(users))
+    await update.message.reply_text("Bot Users: {}".format(users))
 	#update.message.reply_text("Bot Users: {}".format(config_IDs))
     
 async def addWL(update: Update, context: CallbackContext):
@@ -196,10 +187,10 @@ async def addWL(update: Update, context: CallbackContext):
                 userfile.write("%s\n" % item)
         userfile.close()
         print("User added. Current users:", users) # Print users to console
-        update.message.reply_text("User added successfully.")
+        await update.message.reply_text("User added successfully.")
     else:
         print("User already exists in the list. Current users:", users) # Print users to console
-        update.message.reply_text("User already exists in the list.")
+        await update.message.reply_text("User already exists in the list.")
 
 if __name__ == "__main__":
     application = Application.builder().token(bot_token).build()
@@ -207,8 +198,8 @@ if __name__ == "__main__":
     conversation_handler = ConversationHandler(
         entry_points=[CommandHandler('start', start)],
         states={
-        AWAITING_TEMPERATURE: [MessageHandler(filters.Text, get_temperature)],
-        LISTENING: [MessageHandler(filters.Text, listen)]
+        AWAITING_TEMPERATURE: [MessageHandler(filters.ALL, get_temperature)],
+        LISTENING: [MessageHandler(filters.ALL, listen)]
         },
         fallbacks=[CommandHandler('cancel', cancel)]
     )
@@ -217,10 +208,10 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler('subscribe', subscribe))
     application.add_handler(CommandHandler('help', help))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_handler))
-    application.add_handler(MessageHandler(filters._SuccessfulPayment, successful_payment_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
     # Filters out unknown messages.
-    application.add_handler(MessageHandler(filters.Text, unknown_text))
+    application.add_handler(MessageHandler(filters.ALL, unknown_text))
     
     print("starting to poll...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
